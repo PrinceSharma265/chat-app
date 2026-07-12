@@ -1,7 +1,15 @@
+const fs = require("fs");
 const path = require("path");
 const Database = require("better-sqlite3");
 
-const dbPath = path.join(__dirname, "..", "..", "data", "chat.db");
+const dataDir = path.join(__dirname, "..", "..", "data");
+
+// Ensure the data directory exists (it's gitignored, so a fresh clone won't have it)
+if (!fs.existsSync(dataDir)) {
+  fs.mkdirSync(dataDir, { recursive: true });
+}
+
+const dbPath = path.join(dataDir, "chat.db");
 const db = new Database(dbPath);
 
 db.exec(`
