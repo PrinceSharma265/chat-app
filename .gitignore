@@ -1,0 +1,13 @@
+node_modules/
+**/node_modules/
+.env
+*.env
+backend/data/
+*.db
+*.sqlite
+frontend/.expo/
+frontend/dist/
+frontend/web-build/
+frontend/android/
+frontend/ios/
+.DS_Store
