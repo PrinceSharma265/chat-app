@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import MessageBubble from "../src/components/MessageBubble";
 import { API_URL } from "../src/constants/config";
 import { colors } from "../src/theme/colors";
@@ -33,6 +34,7 @@ export default function ChatScreen() {
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -61,7 +63,14 @@ export default function ChatScreen() {
 
     const handleConnect = () => {
       console.log("Socket connected, joining as", currentUsername);
+      setIsConnected(true);
+      setError(null);
       socket.emit("user_join", { username: currentUsername });
+    };
+
+    const handleDisconnect = () => {
+      console.log("Socket disconnected");
+      setIsConnected(false);
     };
 
     const handleIncomingMessage = (message: Message) => {
@@ -106,6 +115,7 @@ export default function ChatScreen() {
     // This avoids missing events if the socket is already connected
     // by the time this effect runs (e.g. fast refresh, remounts).
     socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
     socket.on("receive_message", handleIncomingMessage);
     socket.on("online_users", handleOnlineUsers);
     socket.on("user_typing", handleUserTyping);
@@ -122,6 +132,7 @@ export default function ChatScreen() {
     return () => {
       isMounted = false;
       socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
       socket.off("receive_message", handleIncomingMessage);
       socket.off("online_users", handleOnlineUsers);
       socket.off("user_typing", handleUserTyping);
@@ -157,13 +168,11 @@ export default function ChatScreen() {
     }
   };
 
-const handleInputChange = (value: string) => {
+  const handleInputChange = (value: string) => {
     setInputValue(value);
 
     const socket = getSocket();
-    console.log("handleInputChange fired. Socket connected?", socket?.connected, "isTypingRef:", isTypingRef.current);
     if (!socket?.connected) {
-      console.log("Socket not connected, aborting typing emit");
       return;
     }
 
@@ -191,7 +200,7 @@ const handleInputChange = (value: string) => {
 
     const socket = getSocket();
     if (!socket?.connected) {
-      setError("Socket is not connected");
+      setError("Connecting to server, please wait a moment...");
       return;
     }
 
@@ -206,19 +215,21 @@ const handleInputChange = (value: string) => {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
     >
-      <View style={styles.headerBar}>
+      <SafeAreaView edges={["top"]} style={styles.headerBar}>
         <Text style={styles.appTitle}>ChatApp</Text>
         <View style={styles.headerMeta}>
           <View style={styles.statusBadge}>
             <View style={styles.statusDot} />
-            <Text style={styles.statusText}>{onlineUsers.length} online</Text>
+            <Text style={styles.statusText}>
+              {isConnected ? `${onlineUsers.length} online` : "Connecting..."}
+            </Text>
           </View>
           <Text style={styles.usernameText}>{currentUsername}</Text>
         </View>
-      </View>
+      </SafeAreaView>
 
       {error ? (
         <View style={styles.errorBanner}>
@@ -258,7 +269,11 @@ const handleInputChange = (value: string) => {
           value={inputValue}
           onChangeText={handleInputChange}
         />
-        <TouchableOpacity style={styles.sendButton} accessibilityLabel="Send message" onPress={handleSend}>
+        <TouchableOpacity
+          style={[styles.sendButton, !isConnected && styles.sendButtonDisabled]}
+          accessibilityLabel="Send message"
+          onPress={handleSend}
+        >
           <Text style={styles.sendButtonText}>➤</Text>
         </TouchableOpacity>
       </View>
@@ -378,6 +393,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
+  },
+  sendButtonDisabled: {
+    opacity: 0.5,
   },
   sendButtonText: {
     color: colors.text,
